@@ -1,125 +1,232 @@
 import 'package:flutter/material.dart';
+import 'package:table_calendar/table_calendar.dart';
+import 'package:intl/intl.dart';
 
 void main() {
-  runApp(const MyApp());
+  runApp(MyApp());
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        useMaterial3: true,
-      ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      home: CalendarScreen(),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
-
+class CalendarScreen extends StatefulWidget {
   @override
-  State<MyHomePage> createState() => _MyHomePageState();
+  _CalendarScreenState createState() => _CalendarScreenState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+class _CalendarScreenState extends State<CalendarScreen> {
+  DateTime _selectedDay = DateTime.now();
+  DateTime _focusedDay = DateTime.now();
+  TextEditingController _praiseController = TextEditingController();
+  TextEditingController _personController = TextEditingController();
 
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
-    });
+  // 褒められたこと、誰から、そして自覚のある選択肢
+  String? _selectedPerson;
+  String? _selectedAwareness;
+  List<String> _persons = []; // 誰からのリスト（ユーザーが追加可能）
+  Map<DateTime, List<Map<String, String>>> _praises = {}; // 褒められたことを保存
+
+  // 自覚があるかないかの選択肢
+  final List<String> _awarenessOptions = ['ある', 'ない'];
+
+  // 褒められたことの登録処理
+  void _addPraise() {
+    if (_praiseController.text.isNotEmpty && _selectedPerson != null && _selectedAwareness != null) {
+      setState(() {
+        // 選択された日付に褒められたことを保存
+        if (_praises[_selectedDay] == null) {
+          _praises[_selectedDay] = [];
+        }
+
+        _praises[_selectedDay]!.add({
+          'praise': _praiseController.text,
+          'person': _selectedPerson!,
+          'awareness': _selectedAwareness!,
+        });
+
+        // 入力欄をクリア
+        _praiseController.clear();
+        _personController.clear();
+        _selectedPerson = null;
+        _selectedAwareness = null;
+      });
+
+      Navigator.pop(context); // ダイアログを閉じる
+    }
+  }
+
+  // 褒められたことのリストを表示
+  Widget _buildPraiseList() {
+    List<Map<String, String>> praises = _praises[_selectedDay] ?? [];
+    return ListView.builder(
+      itemCount: praises.length,
+      itemBuilder: (context, index) {
+        var praise = praises[index];
+        return ListTile(
+          title: Text(praise['praise']!),
+          subtitle: Text('誰から: ${praise['person']} - 自覚がある？: ${praise['awareness']}'),
+        );
+      },
+    );
+  }
+
+  // 褒められたことを入力するダイアログ
+  void _showPraiseDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('今日褒められたことを登録'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 褒められたこと
+              TextField(
+                controller: _praiseController,
+                decoration: InputDecoration(
+                  hintText: '褒められたことを入力',
+                ),
+              ),
+              // 誰から？
+              DropdownButton<String>(
+                isExpanded: true,
+                value: _selectedPerson,
+                hint: Text('誰から褒められましたか？'),
+                onChanged: (String? newValue) {
+                  setState(() {
+                    _selectedPerson = newValue;
+                  });
+                },
+                items: _persons.map<DropdownMenuItem<String>>((String person) {
+                  return DropdownMenuItem<String>(
+                    value: person,
+                    child: Text(person),
+                  );
+                }).toList()
+              ),
+              // 新しい名前を追加するボタン
+              TextButton(
+                onPressed: () {
+                  _showAddPersonDialog(context);
+                },
+                child: Text('名前を追加'),
+              ),
+              // 自覚があるか？
+              Row(
+                children: _awarenessOptions.map((option) {
+                  return Expanded(
+                    child: RadioListTile<String>(
+                      title: Text(option),
+                      value: option,
+                      groupValue: _selectedAwareness,
+                      onChanged: (String? value) {
+                        setState(() {
+                          _selectedAwareness = value;
+                        });
+                      },
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              child: Text('キャンセル'),
+              onPressed: () {
+                Navigator.pop(context);
+              },
+            ),
+            TextButton(
+              child: Text('保存'),
+              onPressed: _addPraise,
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // 新しい「誰から？」の名前を追加するダイアログ
+  void _showAddPersonDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('新しい名前を追加'),
+          content: TextField(
+            controller: _personController,
+            decoration: InputDecoration(
+              hintText: '名前を入力',
+            ),
+          ),
+          actions: [
+            TextButton(
+              child: Text('キャンセル'),
+              onPressed: () {
+                Navigator.pop(context);
+              },
+            ),
+            TextButton(
+              child: Text('追加'),
+              onPressed: () {
+                if (_personController.text.isNotEmpty) {
+                  setState(() {
+                    _persons.add(_personController.text);
+                    _selectedPerson = _personController.text;
+                    _personController.clear();
+                  });
+                  Navigator.pop(context);
+                }
+              },
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
     return Scaffold(
       appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
+        title: Text('褒められたことカレンダー'),
       ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
+      body: Padding(
+        padding: const EdgeInsets.all(8.0),
         child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text(
-              'You have pushed the button this many times:',
+          children: [
+            // カレンダー
+            TableCalendar(
+              firstDay: DateTime.utc(2020, 1, 1),
+              lastDay: DateTime.utc(2030, 12, 31),
+              focusedDay: _focusedDay,
+              selectedDayPredicate: (day) {
+                return isSameDay(_selectedDay, day);
+              },
+              onDaySelected: (selectedDay, focusedDay) {
+                setState(() {
+                  _selectedDay = selectedDay;
+                  _focusedDay = focusedDay;
+                });
+                _showPraiseDialog(context); // 褒められたことの入力ダイアログを表示
+              },
+              onPageChanged: (focusedDay) {
+                _focusedDay = focusedDay;
+              },
             ),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
+            SizedBox(height: 10),
+            // 褒められたことリスト
+            Expanded(child: _buildPraiseList()),
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
     );
   }
 }
