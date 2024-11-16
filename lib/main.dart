@@ -108,7 +108,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     value: person,
                     child: Text(person),
                   );
-                }).toList()
+                }).toList(),
               ),
               // 新しい名前を追加するボタン
               TextButton(
@@ -176,13 +176,15 @@ class _CalendarScreenState extends State<CalendarScreen> {
             TextButton(
               child: Text('追加'),
               onPressed: () {
+                String newOption = _personController.text.trim();
                 if (_personController.text.isNotEmpty) {
                   setState(() {
-                    _persons.add(_personController.text);
-                    _selectedPerson = _personController.text;
+                    _persons.add(newOption);
+                    _selectedPerson = newOption;  // 追加した名前を選択状態にする
                     _personController.clear();
                   });
-                  Navigator.pop(context);
+                  Navigator.pop(context);  // ダイアログを閉じる
+                  _showPraiseDialog(context);  // 再度ダイアログを表示して新しい名前を反映
                 }
               },
             ),
